@@ -17,12 +17,16 @@ userRouter.post('/signup', async (c) => {
     }).$extends(withAccelerate())
 
     try{
+        const hashedPassord  = await crypto.subtle.digest({
+          name: "SHA-256"
+        }, new TextEncoder().encode(body.password))
+        const passArray = new Uint8Array(hashedPassord)
         const res = await prisma.user.create({
           data: {
             firstname: body.firstname,
             lastname: body.lastname,
             username: body.username,
-            password: body.password
+            password: new TextDecoder("utf-8").decode(passArray)
           },
           select: {
             id: true
@@ -47,22 +51,27 @@ userRouter.post('/signup', async (c) => {
     const prisma = new PrismaClient({
       datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
-  
-      const res = await prisma.user.findFirst({
-        where: {
-          username: body.username,
-          password: body.password
-        }
-      })
-  
-      if(!res){
-        c.status(411)
-        return c.json({
-          message: "User Not found! Please Sign up"
-        })
+
+    const hashedPassord  = await crypto.subtle.digest({
+      name: "SHA-256"
+    }, new TextEncoder().encode(body.password))
+    const passArray = new Uint8Array(hashedPassord)
+
+    const res = await prisma.user.findFirst({
+      where: {
+        username: body.username,
+        password: new TextDecoder('utf-8').decode(passArray)
       }
-  
-      const jwt = await sign({userId: res.id}, c.env.JWT_SECRET)
-      return c.json({ token : jwt })
+    })
+
+    if(!res){
+      c.status(411)
+      return c.json({
+        message: "User Not found! Please Sign up"
+      })
+    }
+
+    const jwt = await sign({userId: res.id}, c.env.JWT_SECRET)
+    return c.json({ token : jwt })
   })
 
