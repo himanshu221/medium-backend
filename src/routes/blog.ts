@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { verify } from "hono/jwt";
 import { PrismaClient } from "@prisma/client/edge"
 import { withAccelerate } from "@prisma/extension-accelerate"
+import { createBlogSchema, updateBlogSchema } from "@himanshu212/medium-commons";
 
 export const blogRouter = new Hono<{
     Bindings: {
@@ -34,6 +35,14 @@ blogRouter.use('/*', async (c, next) => {
 })
 blogRouter.post('/', async (c) => {
     const body = await c.req.json()
+    const validation = createBlogSchema.safeParse(body)
+    
+    if(!validation.success){
+      c.status(411)
+      return c.json({
+        message : validation.error
+      })
+    }
     const authorId = c.get("userId")
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
@@ -60,6 +69,15 @@ blogRouter.post('/', async (c) => {
 })
 blogRouter.put('/', async (c) => {
     const body = await c.req.json()
+    const validation = updateBlogSchema.safeParse(body)
+    
+    if(!validation.success){
+      c.status(411)
+      return c.json({
+        message : validation.error
+      })
+    }
+    const authorId = c.get("userId")
     const prisma = new PrismaClient({
         datasourceUrl: c.env.DATABASE_URL,
       }).$extends(withAccelerate())
@@ -68,6 +86,7 @@ blogRouter.put('/', async (c) => {
         await prisma.blog.update({
             where: {
                 id: body.id,
+                authorId: Number(authorId)
             },
             data: {
                 title: body.title,

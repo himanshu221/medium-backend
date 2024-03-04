@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client/edge"
 import { withAccelerate } from "@prisma/extension-accelerate"
 import { sign } from "hono/jwt"
 import { Hono } from "hono"
+import { signinSchema, signupSchema } from "@himanshu212/medium-commons"
 
 export const userRouter = new Hono<{
     Bindings: {
@@ -12,15 +13,26 @@ export const userRouter = new Hono<{
 
 userRouter.post('/signup', async (c) => {
     const body = await c.req.json()
+
+    const validation = signupSchema.safeParse(body)
+    
+    if(!validation.success){
+      c.status(411)
+      return c.json({
+        message : validation.error
+      })
+    }
+
     const prisma = new PrismaClient({
       datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
 
+    const hashedPassword  = await crypto.subtle.digest({
+      name: "SHA-256"
+    }, new TextEncoder().encode(body.password))
+    const passArray = new Uint8Array(hashedPassword)
+
     try{
-        const hashedPassord  = await crypto.subtle.digest({
-          name: "SHA-256"
-        }, new TextEncoder().encode(body.password))
-        const passArray = new Uint8Array(hashedPassord)
         const res = await prisma.user.create({
           data: {
             firstname: body.firstname,
@@ -48,10 +60,20 @@ userRouter.post('/signup', async (c) => {
   
   userRouter.post('/signin', async (c) => {
     const body = await c.req.json()
+
+    const validation = signinSchema.safeParse(body)
+    
+    if(!validation.success){
+      c.status(411)
+      return c.json({
+        message : validation.error
+      })
+    }
+
     const prisma = new PrismaClient({
       datasourceUrl: c.env.DATABASE_URL,
     }).$extends(withAccelerate())
-
+  
     const hashedPassord  = await crypto.subtle.digest({
       name: "SHA-256"
     }, new TextEncoder().encode(body.password))
